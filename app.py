@@ -302,7 +302,7 @@ hr { border-color: #e8e4dc !important; }
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  CẤU HÌNH API
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-GEMINI_API_KEY = "AIzaSyCSZo3_0Rw9gn7sDdK-7cyEAt74swvtt5M"
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 GEMINI_MODEL   = "gemini-2.5-flash"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

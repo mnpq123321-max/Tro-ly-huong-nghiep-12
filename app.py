@@ -1,176 +1,291 @@
+import sqlite3
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
-import datetime
 from google import genai
 from google.genai import types
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  CẤU HÌNH GIAO DIỆN CƠ BẢN
+# 1. CẤU HÌNH GIAO DIỆN & CSS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 st.set_page_config(
     page_title="Hướng Nghiệp 12 PRO",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  CSS - LÀM ĐẸP GIAO DIỆN
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.markdown("""
+CUSTOM_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:wght@700;900&display=swap');
-*, *::before, *::after { box-sizing: border-box; }
-html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
-.stApp { background: #f8f7f4; }
-.top-banner {
-    background: linear-gradient(135deg, #0f1923, #1a2738);
-    padding: 25px 48px;
-    border-radius: 0 0 20px 20px;
-    margin-bottom: 20px;
-    color: white;
-    text-align: center;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
 }
-.banner-title { font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;}
-.banner-desc { font-size: 1rem; color: #a8b9cc; }
-[data-testid="stChatMessage"] { background: white !important; border-radius: 15px !important; padding: 15px !important; box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important; margin-bottom: 15px !important; border: 1px solid #e8e8e4 !important;}
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) { background: #eef2f6 !important; border: 1px solid #d5e1ed !important;}
-table { width: 100% !important; border-collapse: collapse !important; margin: 15px 0 !important; }
-th { background: #0f1923 !important; color: #f5a623 !important; padding: 10px !important; text-align: center !important; }
-td { padding: 10px !important; border-bottom: 1px solid #e8e8e4 !important; text-align: center !important;}
+
+.stApp {
+    background: #f5f7fb;
+}
+
+.hero {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    padding: 2rem;
+    border-radius: 24px;
+    color: white;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2);
+}
+
+.hero h1 { margin: 0; font-weight: 800; font-size: 2.2rem; }
+.hero p { margin-top: 5px; font-size: 1.1rem; opacity: 0.9; }
+
+.metric-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+[data-testid="stChatMessage"] {
+    border-radius: 20px !important;
+    padding: 16px !important;
+    background: white;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 12px;
+}
 </style>
-""", unsafe_allow_html=True)
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  CẤU HÌNH API BẢO MẬT (LẤY TỪ KÉT SẤT)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-except KeyError:
-    st.error("❌ Thầy ơi, thầy chưa cất mã API vào Két sắt (Secrets) của Streamlit rồi. Thầy vào Settings -> Secrets để dán mã vào nhé!")
-    st.stop()
-
-GEMINI_MODEL = "gemini-2.5-flash"
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  BỘ NÃO AI - KỶ LUẬT THÉP VÀ DỰ BÁO 2026
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def build_system_prompt(profile: dict) -> str:
-    base_prompt = """Bạn là **Thầy T** — một chuyên gia tư vấn hướng nghiệp bí ẩn nhưng vô cùng uyên bác, tâm lý, chuyên tư vấn cho học sinh lớp 12 tại miền Nam.
-
-🔴 KỶ LUẬT DỮ LIỆU ĐIỂM CHUẨN (TUYỆT ĐỐI TUÂN THỦ):
-1. BẮT BUỘC SỬ DỤNG CÔNG CỤ TÌM KIẾM (GOOGLE SEARCH) ĐỂ TRA CỨU ĐIỂM CHUẨN CHÍNH XÁC CỦA NĂM 2024 VÀ 2025 TRƯỚC KHI TRẢ LỜI.
-2. KHÔNG ĐƯỢC TỰ BỊA ĐẶT HOẶC ĐOÁN MÒ ĐIỂM CHUẨN DƯỚI BẤT KỲ HÌNH THỨC NÀO.
-3. CẢNH GIÁC "ĐIỂM SÀN": Phân biệt cực kỳ rõ ràng giữa "Điểm sàn/Điểm nhận hồ sơ" (thường rất thấp, 15-18 điểm) và "Điểm chuẩn trúng tuyển". CHỈ ĐƯỢC LẤY ĐIỂM CHUẨN TRÚNG TUYỂN.
-4. Nếu tra cứu không thấy dữ liệu chính thức của một trường/ngành, BẮT BUỘC ghi rõ: "N/A - Chưa có dữ liệu chính thức". TUYỆT ĐỐI KHÔNG tự điền một con số ngẫu nhiên.
-5. XÁC MINH KÉP: Hãy kiểm tra kỹ lại kết quả tìm kiếm của bạn. Ví dụ: Ngành Thú y ĐH Cần Thơ điểm chuẩn các năm gần đây thường ở mức cao (thường trên 23-24 điểm), không thể ở mức 18-19 điểm. NẾU CON SỐ TÌM ĐƯỢC QUÁ THẤP HOẶC VÔ LÝ so với mặt bằng chung của ngành đó ở một trường lớn, HÃY BÁO LỖI HOẶC TỪ CHỐI ĐƯA SỐ LIỆU.
-
-📋 CẤU TRÚC TƯ VẤN BẮT BUỘC (Trình bày đẹp, dài và sâu sắc):
-1. **Phân tích ngành:** Học gì? Hợp với ai?
-2. **Bảng Điểm Chuẩn & Dự Báo (Kẻ bảng 4 cột y hệt mẫu này):**
-| Trường/Ngành | Điểm 2023 | Điểm 2024 | Điểm 2025 | Dự báo 2026 (Xu hướng) |
-|---|---|---|---|---|
-| (Tên trường) | X.X | Y.Y | Z.Z | Tăng/Giảm nhẹ khoảng 0.5đ do... |
-*(Bắt buộc phải có cột Dự báo 2026 và phân tích tại sao lại dự báo như vậy)*
-3. **Đời sống & Khoảng cách:** Gợi ý trường gần nơi học sinh sống (nếu có thông tin). KTX, học phí.
-4. **Cơ hội việc làm:** Ra trường làm gì? Lương bao nhiêu?
-5. **Đo lường Tỷ lệ đậu:** So sánh điểm thi thử của học sinh với điểm dự báo 2026 để kết luận: 🟢 An Toàn, 🟡 Vừa Sức, hay 🔴 Rủi Ro.
-
-🗣️ PHONG CÁCH: Xưng "thầy", gọi "em". Rất chuyên nghiệp, thấu hiểu.
 """
-    
-    # Ép hồ sơ học sinh vào não AI
-    if any(profile.values()):
-        base_prompt += "\n\n👤 HỒ SƠ CỦA EM HỌC SINH ĐANG HỎI:\n"
-        if profile.get("score"): base_prompt += f"- Điểm thi thử: {profile['score']}\n"
-        if profile.get("combo"): base_prompt += f"- Tổ hợp: {profile['combo']}\n"
-        base_prompt += "=> Bắt buộc dùng Điểm thi thử này để Rà soát Tỷ lệ đậu cho em ấy."
-
-    return base_prompt
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  KHỞI TẠO HỆ THỐNG MỚI (TẠM BIỆT LỖI)
+# 2. KHỞI TẠO & XỬ LÝ DATABASE (SQLite)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@st.cache_resource(show_spinner=False)
-def get_gemini_client():
-    return genai.Client(api_key=GEMINI_API_KEY)
+DB_PATH = "admissions.db"
 
-client = get_gemini_client()
-# Khai báo công cụ tìm kiếm theo chuẩn SDK mới nhất (Cái này chữa dứt điểm lỗi)
-SEARCH_TOOL = types.Tool(google_search=types.GoogleSearch())
-
-def make_config(use_search: bool, profile: dict):
-    return types.GenerateContentConfig(
-        system_instruction=build_system_prompt(profile),
-        tools=[SEARCH_TOOL] if use_search else [],
-        temperature=0.0, # ÉP VỀ 0.0 ĐỂ DẬP TẮT HOÀN TOÀN SỰ BỊA ĐẶT, CÓ SAO NÓI VẬY
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS admissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        school TEXT, major TEXT, combo TEXT,
+        score_2023 REAL, score_2024 REAL, score_2025 REAL,
+        tuition TEXT, city TEXT, dorm TEXT, career TEXT
     )
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  SIDEBAR & GIAO DIỆN
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-with st.sidebar:
-    st.markdown("## 📋 Hồ Sơ Của Em")
-    if "profile" not in st.session_state:
-        st.session_state.profile = {}
-    p = st.session_state.profile
-
-    score_input = st.text_input("📊 Điểm thi thử", value=p.get("score", ""))
-    combo_input = st.selectbox("📚 Tổ hợp", ["Chưa chọn", "A00", "A01", "B00", "C00", "D01", "D07", "Khác"], index=0)
+    """)
     
-    if st.button("💾 Lưu hồ sơ", use_container_width=True):
-        st.session_state.profile = {"score": score_input, "combo": combo_input}
-        st.success("✅ Đã lưu để Thầy T phân tích!")
+    # Kiểm tra xem có dữ liệu chưa
+    cur.execute("SELECT COUNT(*) FROM admissions")
+    if cur.fetchone()[0] == 0:
+        sample_data = [
+            ("ĐH CNTT - ĐHQG HCM", "Công nghệ thông tin", "A00,A01", 27.1, 27.5, 27.8, "35-45 triệu/năm", "TP.HCM", "Có KTX", "Software Engineer, AI"),
+            ("ĐH Khoa học Tự nhiên", "Khoa học máy tính", "A00,A01", 28.0, 28.2, 28.4, "30-40 triệu/năm", "TP.HCM", "Có KTX", "AI Research, Data"),
+            ("ĐH Cần Thơ", "Thú y", "B00", 24.5, 24.8, 25.1, "22-28 triệu/năm", "Cần Thơ", "Có KTX", "Bác sĩ thú y"),
+            ("ĐH Đồng Tháp", "Sư phạm Toán", "A00", 23.5, 24.0, 24.5, "Miễn học phí", "Đồng Tháp", "Có KTX", "Giáo viên THPT"),
+        ]
+        cur.executemany("""
+            INSERT INTO admissions (school, major, combo, score_2023, score_2024, score_2025, tuition, city, dorm, career) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, sample_data)
+        conn.commit()
+    conn.close()
 
+# Khởi chạy DB
+init_db()
+
+def search_major(keyword):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM admissions WHERE major LIKE ?", conn, params=[f"%{keyword}%"])
+    conn.close()
+    return df
+
+def get_all_data():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM admissions", conn)
+    conn.close()
+    return df
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 3. THUẬT TOÁN DỰ BÁO VÀ CHẤM ĐIỂM
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def predict_score(score23, score24, score25):
+    """Sử dụng Hồi quy tuyến tính (Linear Regression) để dự báo điểm 2026"""
+    x = np.array([2023, 2024, 2025])
+    y = np.array([score23, score24, score25])
+    slope, intercept = np.polyfit(x, y, 1)
+    prediction = slope * 2026 + intercept
+    return min(round(prediction, 2), 30.0) # Không quá 30 điểm
+
+def classify_chance(student_score, predicted_score):
+    diff = student_score - predicted_score
+    if diff >= 1.0: return "🟢 An toàn"
+    elif diff >= -0.5: return "🟡 Vừa sức"
+    else: return "🔴 Rủi ro"
+
+def recommend_schools(student_score, combo):
+    df = get_all_data()
+    recommendations = []
+    for _, row in df.iterrows():
+        # Lọc cơ bản theo tổ hợp
+        if combo in row["combo"] or combo == "Khác":
+            predicted = predict_score(row["score_2023"], row["score_2024"], row["score_2025"])
+            status = classify_chance(student_score, predicted)
+            recommendations.append({
+                "school": row["school"], "major": row["major"],
+                "predicted": predicted, "status": status,
+                "tuition": row["tuition"], "city": row["city"]
+            })
+    return recommendations
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 4. THIẾT KẾ GIAO DIỆN (UI COMPONENTS)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown(
+    """<div class='hero'>
+        <h1>🎓 HƯỚNG NGHIỆP 12 PRO</h1>
+        <p>Hệ thống AI Tư vấn Tuyển sinh & Dự báo điểm chuẩn 2026</p>
+    </div>""", unsafe_allow_html=True
+)
+
+with st.sidebar:
+    st.header("📋 Hồ sơ học sinh")
+    score = st.number_input("Điểm thi thử hiện tại", min_value=0.0, max_value=30.0, value=24.0, step=0.25)
+    combo = st.selectbox("Tổ hợp xét tuyển", ["A00", "A01", "B00", "D01", "C00", "Khác"])
+    favorite_major = st.text_input("Ngành quan tâm nhất", value="Công nghệ thông tin")
+    
     st.divider()
-    if "messages" in st.session_state and len(st.session_state.messages) > 1:
-        chat_data = "PHIẾU TƯ VẤN - THẦY T\n" + "="*30 + "\n"
-        for m in st.session_state.messages:
-            chat_data += f"{m['role'].upper()}: {m['content']}\n\n"
-        st.download_button("📥 Tải phiếu tư vấn", chat_data, "Phieu_Tu_Van.txt", use_container_width=True)
-
-    if st.button("🗑️ Xóa hội thoại", use_container_width=True):
+    st.markdown("**Thống kê Hồ sơ:**")
+    c1, c2 = st.columns(2)
+    c1.metric("Điểm của em", f"{score}đ")
+    c2.metric("Tổ hợp", combo)
+    if st.button("🗑️ Xóa lịch sử trò chuyện AI", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-st.markdown("""
-<div class="top-banner">
-    <div class="banner-title">🎓 TRỢ LÝ HƯỚNG NGHIỆP 12 PRO</div>
-    <div class="banner-desc">Cố vấn chiến lược: Thầy T. — Dự báo điểm chuẩn 2026 & Đo lường tỷ lệ đậu</div>
-</div>
-""", unsafe_allow_html=True)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 5. HIỂN THỊ PHÂN TÍCH & BIỂU ĐỒ TRỰC QUAN
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.subheader("🎯 Cỗ máy Đo lường Mức độ Phù hợp")
+recommendations = recommend_schools(score, combo)
+
+if recommendations:
+    cols = st.columns(min(len(recommendations), 3))
+    for idx, rec in enumerate(recommendations[:3]):
+        with cols[idx]:
+            st.markdown(f"""
+            <div class='metric-card'>
+                <h4 style='color: #1e40af; margin-top:0;'>{rec['school']}</h4>
+                <b>Ngành:</b> {rec['major']}<br>
+                <b>Dự báo 2026:</b> {rec['predicted']} đ<br>
+                <b>Tỷ lệ đậu:</b> {rec['status']}<br>
+                <b>Học phí:</b> {rec['tuition']}<br>
+                <b>Khu vực:</b> {rec['city']}
+            </div>
+            """, unsafe_allow_html=True)
+else:
+    st.info("Chưa tìm thấy trường phù hợp trong cơ sở dữ liệu mẫu. Hãy hỏi Chatbot AI bên dưới nhé!")
+
+st.divider()
+
+st.subheader("📈 Phân tích Xu hướng Điểm chuẩn")
+df_search = search_major(favorite_major)
+
+if not df_search.empty:
+    row = df_search.iloc[0]
+    pred = predict_score(row['score_2023'], row['score_2024'], row['score_2025'])
+    status = classify_chance(score, pred)
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric(f"Dự báo 2026 ({row['school']})", f"{pred} đ", f"{round(pred - row['score_2025'], 2)} đ so với 2025")
+    m2.metric("Khả năng đậu của em", status)
+    m3.metric("Học phí tham khảo", row['tuition'])
+
+    # Vẽ biểu đồ
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[2023, 2024, 2025, 2026], 
+        y=[row['score_2023'], row['score_2024'], row['score_2025'], pred],
+        mode='lines+markers+text',
+        name='Điểm chuẩn',
+        text=[row['score_2023'], row['score_2024'], row['score_2025'], pred],
+        textposition="top center",
+        line=dict(color='#2563eb', width=3),
+        marker=dict(size=10, color=['#1e40af', '#1e40af', '#1e40af', '#ef4444'])
+    ))
+    fig.update_layout(title=f'Biến động điểm ngành {row["major"]} - {row["school"]}', height=350, yaxis_title="Điểm chuẩn", xaxis_title="Năm")
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info(f"Không có dữ liệu biểu đồ cho ngành '{favorite_major}'.")
+
+st.divider()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  XỬ LÝ TRÒ CHUYỆN
+# 6. AI CAREER ADVISOR (TÍCH HỢP GOOGLE SEARCH & CHAT HISTORY)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-if "messages" not in st.session_state or not st.session_state.messages:
-    st.session_state.messages = [{"role": "assistant", "content": "Chào em! Thầy là **Thầy T**. Thầy ở đây để giúp em lướt web lấy điểm chuẩn thật, dự báo điểm 2026 và đo lường tỷ lệ đậu cho em. Em định thi ngành gì nào?"}]
+st.subheader("🤖 Cố vấn AI Hướng nghiệp")
+
+# Lấy API Key an toàn
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    client = genai.Client(api_key=API_KEY)
+except Exception:
+    st.error("⚠️ Chưa tìm thấy GEMINI_API_KEY trong cấu hình Secrets.")
+    st.stop()
+
+MODEL_NAME = "gemini-2.5-flash"
+SEARCH_TOOL = types.Tool(google_search=types.GoogleSearch())
+
+SYSTEM_PROMPT = """Bạn là chuyên gia hướng nghiệp chuyên sâu cho học sinh lớp 12 Tây Ninh.
+NGUYÊN TẮC:
+1. TRA CỨU MẠNG BẮT BUỘC: Khi học sinh hỏi về điểm chuẩn, MỞ GOOGLE SEARCH TÌM NGAY điểm thực tế 2024, 2025.
+2. TUYỆT ĐỐI KHÔNG BỊA SỐ LIỆU. Không tìm thấy thì trả lời "Chưa có dữ liệu chính thức".
+3. TRẢ LỜI CHI TIẾT: Phân tích cơ hội việc làm, học phí, dự báo xu hướng. Trình bày đẹp mắt.
+"""
+
+# Quản lý lịch sử Chat
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "Chào em! Thầy đã xem biểu đồ và hồ sơ của em ở phía trên. Em cần thầy tư vấn thêm về ngành nào hay tra cứu điểm chuẩn trường nào không?"}]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if user_query := st.chat_input("Hỏi Thầy T về ngành, trường, điểm chuẩn..."):
-    st.session_state.messages.append({"role": "user", "content": user_query})
+user_question = st.chat_input("Hỏi AI về ngành học, việc làm, tỷ lệ đậu...")
+
+if user_question:
+    # 1. In câu hỏi của user
+    st.session_state.messages.append({"role": "user", "content": user_query := user_question})
     with st.chat_message("user"):
         st.markdown(user_query)
 
+    # 2. Xử lý AI
     with st.chat_message("assistant"):
-        with st.status("🔍 Thầy T đang rà soát dữ liệu mạng và tính toán dự báo 2026...", expanded=True) as status:
+        with st.spinner("AI đang lướt web và phân tích..."):
             try:
-                # Chuyển đổi lịch sử chat
-                history = [types.Content(role="model" if m["role"] == "assistant" else "user", parts=[types.Part(text=m["content"])]) for m in st.session_state.messages[:-1]]
+                # Ép công cụ tìm kiếm
+                enhanced_query = user_query + "\n[LỆNH TỐI MẬT]: HÃY LƯỚT WEB TRA CỨU ĐIỂM CHUẨN THỰC TẾ. CẤM BỊA ĐẶT."
                 
-                # Gọi AI với Search Tool MỚI
-                cfg = make_config(True, st.session_state.profile)
-                chat = client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
-                response = chat.send_message(user_query + "\n[LỆNH BÍ MẬT]: BẮT BUỘC tra cứu Google lấy điểm chuẩn. Kẻ bảng 4 cột có DỰ BÁO 2026. Chấm tỷ lệ đậu.")
-                reply = response.text
+                # Tạo lịch sử giả lập cho Client mới
+                history = []
+                for m in st.session_state.messages[:-1]:
+                    r = "model" if m["role"] == "assistant" else "user"
+                    history.append(types.Content(role=r, parts=[types.Part(text=m["content"])]))
                 
-                status.update(label="✅ Phân tích hoàn tất!", state="complete", expanded=False)
+                # Gọi API
+                config = types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=[SEARCH_TOOL], # KHÔI PHỤC TÍNH NĂNG TÌM KIẾM
+                    temperature=0.0,     # KHÓA MÕM SỰ BỊA ĐẶT
+                )
+                
+                chat = client.chats.create(model=MODEL_NAME, config=config, history=history)
+                response = chat.send_message(enhanced_query)
+                
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
             except Exception as e:
-                status.update(label="⚠️ Lỗi kết nối", state="error", expanded=False)
-                reply = f"❌ Đã xảy ra lỗi mạng: `{e}`. Em vui lòng F5 tải lại trang nhé."
-                
-        st.markdown(reply)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+                error_msg = f"❌ Xin lỗi em, hệ thống AI đang nghẽn mạng: `{e}`"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})

@@ -58,9 +58,12 @@ GEMINI_MODEL = "gemini-2.5-flash"
 def build_system_prompt(profile: dict) -> str:
     base_prompt = """Bạn là **Thầy T** — một chuyên gia tư vấn hướng nghiệp bí ẩn nhưng vô cùng uyên bác, tâm lý, chuyên tư vấn cho học sinh lớp 12 tại miền Nam.
 
-🔴 KỶ LUẬT DỮ LIỆU (TUYỆT ĐỐI TUÂN THỦ):
-1. KHÔNG BAO GIỜ BỊA ĐIỂM CHUẨN. BẮT BUỘC dùng công cụ Google Search để lấy điểm chuẩn chính xác của năm 2024, 2025.
-2. Nếu lướt web không thấy dữ liệu, BẮT BUỘC trả lời: "Thầy chưa tìm thấy số liệu chính thức của trường này".
+🔴 KỶ LUẬT DỮ LIỆU ĐIỂM CHUẨN (TUYỆT ĐỐI TUÂN THỦ):
+1. BẮT BUỘC SỬ DỤNG CÔNG CỤ TÌM KIẾM (GOOGLE SEARCH) ĐỂ TRA CỨU ĐIỂM CHUẨN CHÍNH XÁC CỦA NĂM 2024 VÀ 2025 TRƯỚC KHI TRẢ LỜI.
+2. KHÔNG ĐƯỢC TỰ BỊA ĐẶT HOẶC ĐOÁN MÒ ĐIỂM CHUẨN DƯỚI BẤT KỲ HÌNH THỨC NÀO.
+3. CẢNH GIÁC "ĐIỂM SÀN": Phân biệt cực kỳ rõ ràng giữa "Điểm sàn/Điểm nhận hồ sơ" (thường rất thấp, 15-18 điểm) và "Điểm chuẩn trúng tuyển". CHỈ ĐƯỢC LẤY ĐIỂM CHUẨN TRÚNG TUYỂN.
+4. Nếu tra cứu không thấy dữ liệu chính thức của một trường/ngành, BẮT BUỘC ghi rõ: "N/A - Chưa có dữ liệu chính thức". TUYỆT ĐỐI KHÔNG tự điền một con số ngẫu nhiên.
+5. XÁC MINH KÉP: Hãy kiểm tra kỹ lại kết quả tìm kiếm của bạn. Ví dụ: Ngành Thú y ĐH Cần Thơ điểm chuẩn các năm gần đây thường ở mức cao (thường trên 23-24 điểm), không thể ở mức 18-19 điểm. NẾU CON SỐ TÌM ĐƯỢC QUÁ THẤP HOẶC VÔ LÝ so với mặt bằng chung của ngành đó ở một trường lớn, HÃY BÁO LỖI HOẶC TỪ CHỐI ĐƯA SỐ LIỆU.
 
 📋 CẤU TRÚC TƯ VẤN BẮT BUỘC (Trình bày đẹp, dài và sâu sắc):
 1. **Phân tích ngành:** Học gì? Hợp với ai?
@@ -100,7 +103,7 @@ def make_config(use_search: bool, profile: dict):
     return types.GenerateContentConfig(
         system_instruction=build_system_prompt(profile),
         tools=[SEARCH_TOOL] if use_search else [],
-        temperature=0.3, # Giảm sáng tạo để tăng độ chính xác của điểm số
+        temperature=0.0, # ÉP VỀ 0.0 ĐỂ DẬP TẮT HOÀN TOÀN SỰ BỊA ĐẶT, CÓ SAO NÓI VẬY
     )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

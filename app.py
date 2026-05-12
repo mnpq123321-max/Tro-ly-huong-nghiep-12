@@ -58,6 +58,7 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     border-radius: 8px !important;
 }
 
+/* Nút chính */
 [data-testid="stSidebar"] .stButton > button {
     width: 100% !important;
     background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
@@ -72,11 +73,20 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     transform: translateY(-2px) !important;
     box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5) !important;
 }
-[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+
+/* Nút phụ (bắt bằng text nội dung thay vì kind) */
+[data-testid="stSidebar"] .stButton > button:contains("📥 Tải phiếu tư vấn"),
+[data-testid="stSidebar"] .stButton > button:contains("🗑️ Reset Hệ thống") {
     background: transparent !important;
     color: #9ca3af !important;
     border: 1px solid #4b5563 !important;
 }
+[data-testid="stSidebar"] .stButton > button:contains("📥 Tải phiếu tư vấn"):hover,
+[data-testid="stSidebar"] .stButton > button:contains("🗑️ Reset Hệ thống"):hover {
+     background: #1f2937 !important;
+     color: #f3f4f6 !important;
+}
+
 
 /* ── TOP BANNER ── */
 .top-banner {
@@ -269,14 +279,16 @@ with st.sidebar:
 
     st.divider()
 
+    # FIX LỖI Ở ĐÂY: XÓA THUỘC TÍNH kind="secondary"
     if "messages" in st.session_state and len(st.session_state.messages) > 1:
         chat_content = f"PHPHIẾU TƯ VẤN V5.0 (THẦY T)\nNgày xuất: {datetime.datetime.now().strftime('%d/%m/%Y')}\n" + "="*40 + "\n\n"
         for m in st.session_state.messages:
             role = "Học sinh" if m["role"] == "user" else "Thầy T"
             chat_content += f"{role}:\n{m['content']}\n\n{'-'*40}\n"
-        st.download_button(label="📥 Tải phiếu tư vấn (.txt)", data=chat_content, file_name="Tu_Van_Thay_T.txt", mime="text/plain", use_container_width=True, kind="secondary")
+        st.download_button(label="📥 Tải phiếu tư vấn (.txt)", data=chat_content, file_name="Tu_Van_Thay_T.txt", mime="text/plain", use_container_width=True)
         
-    if st.button("🗑️ Reset Hệ thống", use_container_width=True, kind="secondary"):
+    # FIX LỖI Ở ĐÂY: XÓA THUỘC TÍNH kind="secondary"
+    if st.button("🗑️ Reset Hệ thống", use_container_width=True):
         st.session_state.messages = []
         st.session_state.pop("strategy_map", None)
         st.rerun()

@@ -7,7 +7,6 @@ from typing import List, Optional
 from google import genai
 from google.genai import types
 
-# 1. CẤU HÌNH TRANG (Bắt buộc phải gọi đầu tiên)
 st.set_page_config(
     page_title="Hướng Nghiệp 12 PRO",
     page_icon="🎓",
@@ -15,7 +14,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CẤU HÌNH GIAO DIỆN & CSS (Tối ưu UI/UX)
 def apply_custom_theme():
     st.markdown("""
         <style>
@@ -80,7 +78,6 @@ def apply_custom_theme():
         </style>
     """, unsafe_allow_html=True)
 
-# 3. DATA SCHEMAS (Ép AI trả về JSON chuẩn, loại bỏ lỗi regex)
 class ScoreRow(BaseModel):
     school: str = Field(description="Tên trường đại học")
     major_combo: str = Field(description="Ngành/Khối thi")
@@ -106,23 +103,21 @@ class CareerRoadmapStep(BaseModel):
 
 class AICounselorResponse(BaseModel):
     """Schema tổng mà AI bắt buộc phải tuân theo khi trả lời"""
-    counseling_text: str = Field(description="Lời tư vấn chính bằng ngôn ngữ tự nhiên, Markdown. Trả lời trực tiếp câu hỏi.")
+    counseling_text: str = Field(description="Lời tư vấn chính. NẾU CÓ TRÍCH DẪN TỪ GOOGLE SEARCH (như [1], [2]), HÃY ĐẶT NÓ VÀO ĐÂY, KHÔNG ĐƯỢC ĐỂ NGOÀI JSON.")
     score_table: Optional[ScoreTable] = Field(None, description="Bảng điểm chuẩn (chỉ tạo nếu user hỏi về điểm/trường).")
     swot: Optional[SWOTAnalysis] = Field(None, description="Phân tích SWOT (chỉ tạo nếu user băn khoăn chọn ngành).")
     roadmap: Optional[List[CareerRoadmapStep]] = Field(None, description="Lộ trình (chỉ tạo nếu user hỏi tương lai, việc làm).")
 
-# 4. SYSTEM PROMPT & AI SETUP
 SYSTEM_PROMPT = """Bạn là Thầy Minh — chuyên gia tư vấn hướng nghiệp 15 năm kinh nghiệm dành cho học sinh THPT Việt Nam.
 Giọng điệu: Ấm áp, thực tế, đi thẳng vào vấn đề, truyền cảm hứng nhưng không sáo rỗng.
 
 NHIỆM VỤ:
-1. Phân tích câu hỏi của học sinh kết hợp với Hồ sơ cá nhân (điểm, khối, sở thích) để đưa ra lời khuyên.
-2. NẾU HỎI VỀ ĐIỂM/TRƯỜNG: BẮT BUỘC dùng công cụ Google Search tìm điểm chuẩn 2023-2025. Không được tự bịa số liệu.
-3. CẤU TRÚC: Trả lời bằng cách điền vào schema JSON hệ thống yêu cầu. Chia rõ: Text tư vấn, Bảng điểm, SWOT, Roadmap.
-4. LƯU Ý ĐỊA LÝ: Mặc định ưu tiên khu vực phía Nam (TP.HCM, Cần Thơ, Tây Ninh...) trừ khi học sinh có yêu cầu khác.
+1. Phân tích câu hỏi kết hợp với Hồ sơ cá nhân để đưa ra lời khuyên.
+2. NẾU HỎI VỀ ĐIỂM/TRƯỜNG: Dùng Google Search tìm điểm chuẩn 2023-2025.
+3. RẤT QUAN TRỌNG VỀ ĐỊNH DẠNG: Bạn PHẢI trả về JSON hợp lệ theo đúng Schema. Tuyệt đối không chèn thêm text Markdown ngoài khối JSON. Nếu có trích dẫn nguồn từ Google, hãy đưa hết vào trường `counseling_text`.
 """
 
-# Khởi tạo Client: Cố gắng lấy từ Streamlit Secrets, nếu không có thì lấy từ Biến môi trường
+# Cố gắng lấy API Key từ Streamlit Secrets, nếu không có thì lấy từ Biến môi trường
 API_KEY = ""
 try:
     if "GEMINI_API_KEY" in st.secrets:
@@ -132,11 +127,10 @@ except Exception:
 
 client = genai.Client(api_key=API_KEY) if API_KEY else None
 
-# 5. CORE LLM SERVICE (Gọi API Gemini)
 def get_ai_response(user_input: str, profile: dict, chat_history: list) -> dict:
     if not client:
         return {
-            "text": "❌ Lỗi: Hệ thống chưa được cấu hình GEMINI_API_KEY. Vui lòng thêm biến môi trường hoặc Streamlit Secrets trên Github.",
+            "text": "❌ **Lỗi nghiêm trọng:** Hệ thống chưa nhận được `GEMINI_API_KEY`. Hãy kiểm tra lại cấu hình trên Github Secrets.",
             "data": None
         }
 
@@ -150,20 +144,19 @@ def get_ai_response(user_input: str, profile: dict, chat_history: list) -> dict:
     
     full_prompt = f"{ctx}\n\nCÂU HỎI MỚI CỦA HỌC SINH:\n{user_input}"
     
-    # Format history cho Gemini SDK
     formatted_history = []
     for msg in chat_history:
         role = "user" if msg["role"] == "user" else "model"
         if text_content := msg.get("content_text", ""):
             formatted_history.append(types.Content(role=role, parts=[types.Part.from_text(text=text_content)]))
 
-    # Kích hoạt Structured Output & Search Grounding
+    # Cấu hình AI với công cụ Search
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
-        temperature=0.3, # Thấp để JSON ổn định
+        temperature=0.3,
         response_mime_type="application/json",
         response_schema=AICounselorResponse,
-        tools=[{"google_search": {}}] # Cấp quyền AI lên mạng search real-time
+        tools=[types.Tool(google_search=types.GoogleSearch())] 
     )
 
     try:
@@ -172,15 +165,27 @@ def get_ai_response(user_input: str, profile: dict, chat_history: list) -> dict:
             contents=formatted_history + [full_prompt],
             config=config
         )
-        # Tự động parse chuỗi JSON trả về thành Pydantic Object an toàn
+        
+        # Nếu AI trả về hợp lệ, bóc tách JSON
         ai_data = AICounselorResponse.model_validate_json(response.text)
         return {"text": ai_data.counseling_text, "data": ai_data}
         
     except Exception as e:
-        print(f"API Error: {e}")
-        return {"text": f"❌ Xin lỗi em, thầy đang gặp chút trục trặc mạng. Em hỏi lại hoặc chi tiết hơn nhé!", "data": None}
+        error_msg = str(e)
+        raw_output = response.text if 'response' in locals() else "Không có dữ liệu trả về từ API."
+        
+        # Xử lý báo lỗi chi tiết để dễ debug
+        if "400" in error_msg or "403" in error_msg:
+            return {
+                "text": f"❌ **Lỗi API Key hoặc Kết nối (400/403):** Hãy kiểm tra lại API Key có đúng không hoặc có bị hết hạn mức không.\n\n*(Chi tiết kỹ thuật: {error_msg})*", 
+                "data": None
+            }
+        else:
+            return {
+                "text": f"❌ **Lỗi giải mã dữ liệu:** AI đã tìm ra thông tin nhưng không thể sắp xếp vào bảng do bị dính ký tự lạ.\n\n**Chi tiết lỗi:** `{error_msg}`\n\n**Dữ liệu thô AI trả về:**\n```json\n{raw_output[:500]}...\n```", 
+                "data": None
+            }
 
-# 6. UI RENDER COMPONENTS (Vẽ bảng, SWOT, Roadmap)
 def render_score_table(table_data: ScoreTable):
     if not table_data or not table_data.rows: return
     st.markdown(f"#### 📊 {table_data.title}")
@@ -215,18 +220,13 @@ def render_roadmap(roadmap_data: List[CareerRoadmapStep]):
             st.divider()
 
 def render_ai_message(message_dict):
-    """Hàm tổng hợp render toàn bộ nội dung của 1 tin nhắn AI"""
     st.markdown(message_dict.get("content_text", ""))
-    
-    # Xử lý phục hồi data từ JSON (khi load lại từ history) hoặc object gốc
     raw_data = message_dict.get("data")
     if not raw_data: return
     
     try:
-        # Nếu là object Pydantic
         if isinstance(raw_data, AICounselorResponse):
             data_obj = raw_data
-        # Nếu là dict (lấy từ session_state)
         elif isinstance(raw_data, dict):
             data_obj = AICounselorResponse(**raw_data)
         else:
@@ -236,9 +236,8 @@ def render_ai_message(message_dict):
         if data_obj.swot: render_swot(data_obj.swot)
         if data_obj.roadmap: render_roadmap(data_obj.roadmap)
     except Exception as e:
-        print(f"Render component error: {e}")
+        st.error(f"Lỗi hiển thị UI: {e}")
 
-# 7. HÀM MAIN VÀ VÒNG LẶP GIAO DIỆN
 def main():
     apply_custom_theme()
     
@@ -246,13 +245,13 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant", 
-            "content_text": "Chào em! 👋 Thầy là **Thầy Minh**. Thầy ở đây để giúp em chọn ngành, chọn trường, tra cứu điểm chuẩn và vạch ra lộ trình học tập. \n\n👉 Hãy điền **Hồ sơ của em** ở cột bên trái để thầy tư vấn chính xác nhất nhé!", 
+            "content_text": "Chào em! 👋 Thầy là **Thầy Minh**. Thầy ở đây để giúp em chọn ngành, chọn trường, tra cứu điểm chuẩn và vạch ra lộ trình học tập. \n\n👉 Hãy điền **Hồ sơ của em** ở cột bên trái hoặc đặt câu hỏi ngay để thầy tư vấn nhé!", 
             "data": None
         }]
     if "profile" not in st.session_state:
         st.session_state.profile = {"score": "", "combo": "Chưa chọn", "major": "", "budget": "Chưa biết", "location": "Phía Nam"}
 
-    # --- SIDEBAR ---
+    # Sidebar
     with st.sidebar:
         st.markdown("## 🎓 Hướng Nghiệp 12 PRO")
         st.caption("AI Mentor - Powered by Gemini 2.5")
@@ -281,7 +280,7 @@ def main():
             st.session_state.messages = st.session_state.messages[:1]
             st.rerun()
 
-    # --- HEADER ---
+    # Header
     st.markdown("""
         <div style="display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #E5E7EB; margin-bottom: 2rem;">
             <div style="background: linear-gradient(135deg, #4F46E5, #7C3AED); padding: 10px; border-radius: 12px; font-size: 24px;">🎓</div>
@@ -292,7 +291,7 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # --- CHAT HISTORY ---
+    # Chat History
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             if msg["role"] == "user":
@@ -300,10 +299,10 @@ def main():
             else:
                 render_ai_message(msg)
 
-    # --- CHAT INPUT ---
+    # Chat Input
     if user_query := st.chat_input("Hỏi thầy bất cứ gì về ngành học, trường đại học, hay điểm chuẩn..."):
         if not API_KEY:
-            st.error("⚠️ CẢNH BÁO: Chưa có GEMINI_API_KEY. Hãy thiết lập trong Streamlit Secrets (Github) hoặc file .env.")
+            st.error("⚠️ CẢNH BÁO: Chưa có GEMINI_API_KEY. Hãy thiết lập trong Streamlit Secrets (Github).")
             st.stop()
             
         st.session_state.messages.append({"role": "user", "content_text": user_query, "data": None})
@@ -322,7 +321,7 @@ def main():
             # Hiển thị
             render_ai_message(response_dict)
             
-            # Lưu lịch sử (Convert Pydantic sang Dict để stream safe)
+            # Lưu lịch sử (Convert Pydantic sang Dict để Streamlit có thể lưu trữ)
             data_to_save = response_dict["data"].model_dump() if response_dict.get("data") else None
             st.session_state.messages.append({"role": "assistant", "content_text": response_dict["text"], "data": data_to_save})
 

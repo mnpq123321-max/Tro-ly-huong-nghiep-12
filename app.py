@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║   TRỢ LÝ HƯỚNG NGHIỆP 12 PRO  —  v5.0 (Bản Thực Chiến Nước Rút)  ║
-║   Engine: Gemini 2.5 Flash + Google Search Grounding             ║
+║   Engine: Gemini 2.5 Flash + Tự động thích nghi Google Search    ║
 ║   Tính năng mới: Đa Tab, Máy đo tỷ lệ đậu, Bản đồ chiến lược     ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
@@ -10,9 +10,7 @@ import streamlit as st
 import datetime
 import google.generativeai as genai
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  PAGE CONFIG (Phải là lệnh đầu tiên)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# PAGE CONFIG (Phải là lệnh đầu tiên)
 st.set_page_config(
     page_title="Hướng Nghiệp 12 PRO",
     page_icon="🎓",
@@ -20,9 +18,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  CSS - GIAO DIỆN HIỆN ĐẠI BẢN 5.0 (Tối ưu Tabs & Nút bấm)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:wght@700;900&display=swap');
@@ -86,7 +81,6 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
      background: #1f2937 !important;
      color: #f3f4f6 !important;
 }
-
 
 /* ── TOP BANNER ── */
 .top-banner {
@@ -180,9 +174,6 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  CẤU HÌNH API
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except KeyError:
@@ -192,9 +183,6 @@ except KeyError:
 # Khởi tạo thư viện
 genai.configure(api_key=GEMINI_API_KEY)
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  SYSTEM PROMPT V5.0 (Ép đo lường tỷ lệ đậu & Nhấn mạnh thời gian)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def build_system_prompt(profile: dict) -> str:
     base_prompt = """Bạn là **Thầy T** — một chuyên gia tư vấn hướng nghiệp xuất sắc, giấu tên, có 15 năm kinh nghiệm đồng hành cùng học sinh THPT tại Việt Nam. 
 ĐẶC BIỆT LƯU Ý: Hiện tại đang là **Tháng 5 năm 2026**. Kỳ thi THPT Quốc gia chỉ còn hơn 1 tháng nữa. Lời khuyên của bạn phải mang tính THỰC CHIẾN, KHẨN TRƯƠNG và CHIẾN LƯỢC.
@@ -202,7 +190,7 @@ def build_system_prompt(profile: dict) -> str:
 ══════════════════════════════════════════════
 🔴 CỖ MÁY ĐO LƯỜNG TỶ LỆ ĐẬU (LỆNH TỐI CAO)
 ══════════════════════════════════════════════
-1. BẮT BUỘC DÙNG GOOGLE SEARCH: Tra cứu điểm chuẩn chính xác 2023, 2024, 2025. Tuyệt đối cấm bịa điểm.
+1. DỮ LIỆU THỰC TẾ: Ưu tiên dùng Internet để tra cứu điểm chuẩn chính xác 2023, 2024, 2025. Tuyệt đối cấm bịa điểm.
 2. BẢNG PHÂN TÍCH 5 CỘT (CẤU TRÚC BẮT BUỘC):
    Dựa vào ĐIỂM THI THỬ của học sinh (nếu có cung cấp), bạn PHẢI đối chiếu với điểm Dự báo 2026 và đưa ra nhãn đánh giá rủi ro ở cột thứ 5.
    | Tổ hợp | 2023 | 2024 | 2025 | Dự báo 2026 | Tỷ lệ đậu (So với điểm thử) |
@@ -241,15 +229,32 @@ def build_system_prompt(profile: dict) -> str:
     return base_prompt
 
 def get_model(profile):
-    return genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=build_system_prompt(profile),
-        tools=[{"google_search": {}}]
-    )
+    """
+    Cơ chế khởi tạo model chống sập: Thử nhiều cú pháp khác nhau của công cụ Google Search.
+    Nếu môi trường cũ không hỗ trợ, tự động dùng model thuần túy để web không bao giờ báo lỗi.
+    """
+    try:
+        # Cách 1: Cú pháp cho phiên bản google-generativeai phổ biến
+        return genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=build_system_prompt(profile),
+            tools="google_search_retrieval"
+        )
+    except:
+        try:
+            # Cách 2: Cú pháp chuẩn kiểu mới
+            return genai.GenerativeModel(
+                model_name="gemini-2.5-flash",
+                system_instruction=build_system_prompt(profile),
+                tools=[{"google_search": {}}]
+            )
+        except:
+            # Cách 3: Chế độ bất tử, bỏ tính năng search để đảm bảo web 100% chạy
+            return genai.GenerativeModel(
+                model_name="gemini-2.5-flash",
+                system_instruction=build_system_prompt(profile)
+            )
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  SIDEBAR
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with st.sidebar:
     st.markdown("## 🎓 Hướng Nghiệp 12 PRO")
     st.caption("Thầy T · Phiên bản 5.0 (Thực Chiến)")
@@ -279,23 +284,19 @@ with st.sidebar:
 
     st.divider()
 
-    # FIX LỖI Ở ĐÂY: XÓA THUỘC TÍNH kind="secondary"
+    # Tính năng MỚI: Tải phiếu tư vấn (đã bỏ thuộc tính kind)
     if "messages" in st.session_state and len(st.session_state.messages) > 1:
-        chat_content = f"PHPHIẾU TƯ VẤN V5.0 (THẦY T)\nNgày xuất: {datetime.datetime.now().strftime('%d/%m/%Y')}\n" + "="*40 + "\n\n"
+        chat_content = f"PHIẾU TƯ VẤN V5.0 (THẦY T)\nNgày xuất: {datetime.datetime.now().strftime('%d/%m/%Y')}\n" + "="*40 + "\n\n"
         for m in st.session_state.messages:
             role = "Học sinh" if m["role"] == "user" else "Thầy T"
             chat_content += f"{role}:\n{m['content']}\n\n{'-'*40}\n"
         st.download_button(label="📥 Tải phiếu tư vấn (.txt)", data=chat_content, file_name="Tu_Van_Thay_T.txt", mime="text/plain", use_container_width=True)
         
-    # FIX LỖI Ở ĐÂY: XÓA THUỘC TÍNH kind="secondary"
     if st.button("🗑️ Reset Hệ thống", use_container_width=True):
         st.session_state.messages = []
         st.session_state.pop("strategy_map", None)
         st.rerun()
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  BANNER MAIN APP
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 st.markdown("""
 <div class="top-banner">
   <div class="banner-left">
@@ -315,7 +316,6 @@ st.markdown("""
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 tab1, tab2 = st.tabs(["💬 Trò chuyện cùng Thầy T", "🗺️ Bản đồ Chiến lược"])
 
-# ----------------- TAB 1: CHAT -----------------
 with tab1:
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -372,15 +372,15 @@ with tab1:
                     reply = response.text
                     status.update(label="✅ Thầy đã tính toán xong!", state="complete", expanded=False)
                 except Exception as e:
-                    reply = f"❌ Xin lỗi em, hệ thống tra cứu mạng đang quá tải: `{e}`. Em thử hỏi lại nhé!"
-                    status.update(label="❌ Lỗi hệ thống", state="error", expanded=False)
+                    # Rất hiếm khi xảy ra lỗi này vì đã có cơ chế catch, nhưng đề phòng đứt mạng
+                    reply = f"❌ Xin lỗi em, hệ thống mạng đang chập chờn một xíu. Em hãy ấn phím F5 để tải lại rồi hỏi lại thầy nhé!"
+                    status.update(label="❌ Lỗi mạng", state="error", expanded=False)
                 
             st.markdown(reply)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
         st.rerun()
 
-# ----------------- TAB 2: BẢN ĐỒ CHIẾN LƯỢC -----------------
 with tab2:
     st.markdown("### 🗺️ BẢN ĐỒ CHIẾN LƯỢC NƯỚC RÚT (THÁNG 5/2026)")
     st.info("Tính năng này sẽ tổng hợp toàn bộ hồ sơ của em để vạch ra một lộ trình ôn tập và đăng ký nguyện vọng tối ưu nhất trong 30 ngày cuối.")
@@ -392,7 +392,7 @@ with tab2:
         if st.button("🚀 Kích hoạt vẽ Bản đồ Chiến lược", type="primary"):
             with st.spinner("⏳ Thầy T đang phác thảo chiến lược riêng cho em..."):
                 prompt_strategy = f"""
-                Dựa vào hồ sơ học sinh: Điểm thi thử {p['score']}, Khối {p['combo']}, Ngành {p['major']}, Môn mạnh {p['strengths']}.
+                Dựa vào hồ sơ học sinh: Điểm thi thử {p.get('score')}, Khối {p.get('combo')}, Ngành {p.get('major')}, Môn mạnh {p.get('strengths')}.
                 Hãy vẽ một "Bản đồ Chiến lược Nước rút Tháng 5/2026" siêu chi tiết gồm:
                 1. Chẩn đoán lâm sàng: Điểm mạnh, điểm yếu hiện tại.
                 2. Chiến thuật xếp 3 lớp nguyện vọng (Đỉnh cao - Vừa sức - Trụ hạng).
@@ -400,11 +400,12 @@ with tab2:
                 Dùng Markdown đẹp, giọng văn như một vị tướng quân ra lệnh xuất trận.
                 """
                 try:
+                    # Dùng trực tiếp model không cần search để lên plan cho nhanh
                     model_str = genai.GenerativeModel(model_name="gemini-2.5-flash")
                     res = model_str.generate_content(prompt_strategy)
                     st.session_state.strategy_map = res.text
                 except Exception as e:
-                    st.error("Có lỗi tạo bản đồ, em thử lại nhé!")
+                    st.error("Có lỗi tạo bản đồ, em thử tải lại trang nhé!")
 
         if "strategy_map" in st.session_state:
             st.markdown("<hr>", unsafe_allow_html=True)

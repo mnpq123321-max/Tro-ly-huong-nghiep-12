@@ -335,11 +335,18 @@ hr { border-color:#21262d !important; }
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════
-#  CẤU HÌNH
+# CẤU HÌNH MODEL
 # ════════════════════════════════════════════════════════
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-GEMINI_MODEL   = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-1.5-flash"
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", None)  # Thêm vào secrets.toml
 
+# Client DeepSeek
+if DEEPSEEK_API_KEY:
+    from openai import OpenAI
+    deepseek_client = OpenAI(
+        base_url="https://api.deepseek.com",
+        api_key=DEEPSEEK_API_KEY
+    )
 # ════════════════════════════════════════════════════════
 #  SYSTEM PROMPT — NÃO CỦA THẦY T
 # ════════════════════════════════════════════════════════

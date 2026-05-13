@@ -341,7 +341,7 @@ hr { border-color:#21262d !important; }
 # ════════════════════════════════════════════════════════
 # CẤU HÌNH MODEL
 # ════════════════════════════════════════════════════════
-GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # FIX: Cần lấy key từ secrets trước khi gọi get_client()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", None)

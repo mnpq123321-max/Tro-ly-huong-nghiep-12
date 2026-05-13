@@ -1,9 +1,9 @@
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║   THẦY T — HƯỚNG NGHIỆP 12 PRO  ·  v5.0 FINAL                 ║
-║   Gemini 2.5 Flash · Google Search Grounding                    ║
-║   Bảng điểm chuẩn đẹp · Dự báo 2026 · Quiz hướng nghiệp       ║
-║   So sánh ngành · Tải phiếu tư vấn · Cá nhân hóa sâu          ║
+║   THẦY T — HƯỚNG NGHIỆP 12 PRO  ·  v5.0 FINAL                    ║
+║   Gemini 2.5 Flash · Google Search Grounding                     ║
+║   Bảng điểm chuẩn đẹp · Dự báo 2026 · Quiz hướng nghiệp          ║
+║   So sánh ngành · Tải phiếu tư vấn · Cá nhân hóa sâu             ║
 ╚══════════════════════════════════════════════════════════════════╝
 Cách dùng:
   1. Tạo file .streamlit/secrets.toml  →  GEMINI_API_KEY = "your_key"
@@ -12,7 +12,11 @@ Cách dùng:
 """
 
 import streamlit as st
-import datetime, re, json
+import datetime
+import re
+import json
+import time
+from collections import Counter
 from google import genai
 from google.genai import types
 
@@ -171,7 +175,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     color: #f0f6fc !important; margin-top: 22px !important; margin-bottom: 8px !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) strong { color: #d4a017 !important; }
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) a     { color: #79c0ff !important; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) a      { color: #79c0ff !important; }
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) li    { margin-bottom: 5px; }
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) hr    { border-color: #21262d !important; margin: 16px 0 !important; }
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) code  {
@@ -276,7 +280,7 @@ div[data-testid="column"] .stButton > button:hover {
 .sc { background:#161b22; border:1px solid #21262d; border-radius:10px;
        padding:11px 15px; margin-bottom:8px; }
 .sc-l { font-size:.66rem; color:#8b949e; font-weight:700; letter-spacing:1.2px;
-          text-transform:uppercase; }
+         text-transform:uppercase; }
 .sc-v { font-size:1rem; color:#e6edf3; font-weight:700; margin-top:4px; }
 .sc-v.g { color:#d4a017; }
 
@@ -338,7 +342,14 @@ hr { border-color:#21262d !important; }
 # CẤU HÌNH MODEL
 # ════════════════════════════════════════════════════════
 GEMINI_MODEL = "gemini-1.5-flash"
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", None)  # Thêm vào secrets.toml
+
+# FIX: Cần lấy key từ secrets trước khi gọi get_client()
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", None)
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", None)
+
+if not GEMINI_API_KEY:
+    st.error("❌ Chưa tìm thấy GEMINI_API_KEY trong file .streamlit/secrets.toml")
+    st.stop()
 
 # Client DeepSeek
 if DEEPSEEK_API_KEY:
@@ -347,6 +358,7 @@ if DEEPSEEK_API_KEY:
         base_url="https://api.deepseek.com",
         api_key=DEEPSEEK_API_KEY
     )
+
 # ════════════════════════════════════════════════════════
 #  SYSTEM PROMPT — NÃO CỦA THẦY T
 # ════════════════════════════════════════════════════════
@@ -531,7 +543,8 @@ def render_tables(text: str):
 def show_msg(content: str):
     """Hiển thị message, chèn bảng HTML đúng vị trí."""
     clean, tables = render_tables(content)
-    if not tables: st.markdown(content); return
+    if not tables: 
+        st.markdown(content); return
     for i, tbl in enumerate(tables):
         ph = f"__T{i}__"
         parts = clean.split(ph, 1)
@@ -635,7 +648,6 @@ def run_quiz():
 
     if st.session_state.quiz_done:
         ans = st.session_state.quiz_answers
-        from collections import Counter
         count = Counter(ans.values())
         top   = count.most_common(1)[0][0]
         res   = QUIZ_RESULT[top]
@@ -669,7 +681,7 @@ def run_quiz():
             if st.button("💬 Hỏi Thầy T về nhóm ngành này", use_container_width=True):
                 q = f"Thầy T ơi, em vừa làm quiz và kết quả là phù hợp với nhóm **{res['group']}**. Ngành {res['suggest'].split(',')[0].strip()} thì điểm chuẩn 2023–2025 bao nhiêu, và trường nào tốt nhất gần Tây Ninh?"
                 st.session_state["_pend"] = q
-                st.session_state.active_tab = 0
+                st.toast("✅ Đã tạo câu hỏi. Em hãy chuyển sang tab 'Chat với Thầy T' nhé!", icon="💬")
                 st.rerun()
         return
 
@@ -731,7 +743,7 @@ def run_compare():
                  f"Thầy so sánh giúp em hai ngành này nhé: điểm chuẩn 2023–2025, cơ hội việc làm, "
                  f"mức lương, và ngành nào phù hợp hơn với học sinh Tây Ninh?")
             st.session_state["_pend"] = q
-            st.session_state.active_tab = 0
+            st.toast("✅ Đã tạo câu hỏi. Em hãy chuyển sang tab 'Chat với Thầy T' nhé!", icon="💬")
             st.rerun()
         else:
             st.warning("⚠️ Em nhập đủ tên 2 ngành nhé!")
@@ -754,8 +766,89 @@ def run_compare():
                      f"Thầy so sánh giúp em hai ngành này: điểm chuẩn 2023–2025, "
                      f"cơ hội việc làm, mức lương, phù hợp với học sinh Tây Ninh không?")
                 st.session_state["_pend"] = q
-                st.session_state.active_tab = 0
+                st.toast("✅ Đã tạo câu hỏi. Em hãy chuyển sang tab 'Chat với Thầy T' nhé!", icon="💬")
                 st.rerun()
+
+
+# ════════════════════════════════════════════════════════
+#  CÁC HÀM XỬ LÝ AI CHÍNH (Đã fix lỗi thụt lề)
+# ════════════════════════════════════════════════════════
+SCORE_KW = ["điểm chuẩn", "tuyển sinh", "xét tuyển", "nguyện vọng", "điểm đầu vào",
+            "trúng tuyển", "học trường nào", "điểm chuẩn"]
+
+def needs_search(t: str) -> bool:
+    return any(k in t.lower() for k in SCORE_KW)
+
+def build_hist(msgs: list) -> list:
+    hist = []
+    # Bỏ câu chào đầu tiên của Thầy T và tin nhắn hiện tại
+    valid_msgs = msgs[1:-1] if len(msgs) > 1 else []
+    
+    for m in valid_msgs:
+        role = "model" if m["role"] == "assistant" else "user"
+        txt = re.sub(r'~~~JSON_TABLE.*?~~~END', '[bảng điểm chuẩn]', 
+                     m["content"], flags=re.DOTALL)
+        hist.append(types.Content(
+            role=role, 
+            parts=[types.Part.from_text(text=txt)] # Fixed: Use from_text
+        ))
+    return hist
+
+# FIX: Đã sửa lỗi Indentation ở hàm này
+def call_ai(user_input: str, profile: dict) -> str:
+    history = build_hist(st.session_state.messages)
+    use_search = needs_search(user_input)
+    
+    enhanced = user_input
+    if use_search:
+        enhanced += "\n\n[LỆNH HỆ THỐNG]: Dùng Google Search tìm điểm chuẩn 2025 ngay. Tìm website chính thức trước."
+    try:
+        cfg = make_cfg(use_search, profile)
+        chat = _client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
+        return chat.send_message(enhanced).text
+    except Exception as e:
+        return f"❌ Lỗi kết nối: {str(e)}\n\nEm thử hỏi lại nhé!"
+
+def deepseek_refine(gemini_text: str, user_input: str) -> str:
+    """DeepSeek làm đẹp nội dung từ Gemini"""
+    if not DEEPSEEK_API_KEY:
+        return gemini_text
+        
+    prompt = f"""Bạn là Thầy T. Dựa vào thông tin sau, hãy viết lại thành bài tư vấn chuyên nghiệp, ấm áp, rõ ràng theo phong cách Thầy T:
+
+Thông tin thô: {gemini_text}
+
+Câu hỏi của học sinh: {user_input}
+
+Viết đầy đủ, dễ hiểu, có cảm xúc."""
+    
+    try:
+        response = deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=3000
+        )
+        return response.choices[0].message.content
+    except:
+        return gemini_text
+
+def deepseek_direct(user_input: str, history, profile) -> str:
+    """Dùng DeepSeek trực tiếp"""
+    if not DEEPSEEK_API_KEY:
+        return "❌ Hiện tại hệ thống đang quá tải. Em thử lại sau ít phút nhé!"
+    
+    try:
+        response = deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": user_input}],
+            temperature=0.75,
+            max_tokens=4000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"❌ Lỗi hệ thống: {str(e)}\n\nEm thử lại sau nhé!"
+
 
 # ════════════════════════════════════════════════════════
 #  SIDEBAR
@@ -879,9 +972,6 @@ st.markdown("""
 # ════════════════════════════════════════════════════════
 #  TABS ĐIỀU HƯỚNG
 # ════════════════════════════════════════════════════════
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = 0
-
 tab_chat, tab_quiz, tab_compare = st.tabs([
     "💬 Chat với Thầy T",
     "🧭 Quiz Hướng Nghiệp",
@@ -943,86 +1033,6 @@ with tab_chat:
                     st.session_state["_pend"] = txt
                     st.rerun()
 
-    # ================== HÀM HỖ TRỢ ==================
-    SCORE_KW = ["điểm chuẩn","tuyển sinh","xét tuyển","nguyện vọng","điểm đầu vào",
-                "trúng tuyển","học trường nào","điểm chuẩn"]
-
-    def needs_search(t: str) -> bool:
-        return any(k in t.lower() for k in SCORE_KW)
-
-    def build_hist(msgs: list) -> list:
-        hist = []
-        # Bỏ câu chào đầu tiên của Thầy T và tin nhắn hiện tại
-        valid_msgs = msgs[1:-1] if len(msgs) > 1 else []
-        
-        for m in valid_msgs:
-            role = "model" if m["role"] == "assistant" else "user"
-            txt = re.sub(r'~~~JSON_TABLE.*?~~~END', '[bảng điểm chuẩn]', 
-                         m["content"], flags=re.DOTALL)
-            hist.append(types.Content(
-                role=role, 
-                parts=[types.Part(text=txt)]
-            ))
-        return hist
-
-        def call_ai(user_input: str, profile: dict) -> str:
-        history = build_hist(st.session_state.messages)
-        use_search = needs_search(user_input)
-        
-        enhanced = user_input
-        if use_search:
-            enhanced += "\n\n[LỆNH HỆ THỐNG]: Dùng Google Search tìm điểm chuẩn 2025 ngay. Tìm website chính thức trước."
-        try:
-            cfg = make_cfg(use_search, profile)
-            chat = _client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
-            return chat.send_message(enhanced).text
-        except Exception as e:
-            return f"❌ Lỗi kết nối: {str(e)}\n\nEm thử hỏi lại nhé!"
-
-
-    # ================== DEEPSEEK HỖ TRỢ ==================
-    def deepseek_refine(gemini_text: str, user_input: str) -> str:
-        """DeepSeek làm đẹp nội dung từ Gemini"""
-        if not DEEPSEEK_API_KEY:
-            return gemini_text
-            
-        prompt = f"""Bạn là Thầy T. Dựa vào thông tin sau, hãy viết lại thành bài tư vấn chuyên nghiệp, ấm áp, rõ ràng theo phong cách Thầy T:
-
-Thông tin thô: {gemini_text}
-
-Câu hỏi của học sinh: {user_input}
-
-Viết đầy đủ, dễ hiểu, có cảm xúc."""
-        
-        try:
-            response = deepseek_client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=3000
-            )
-            return response.choices[0].message.content
-        except:
-            return gemini_text
-
-
-    def deepseek_direct(user_input: str, history, profile) -> str:
-        """Dùng DeepSeek trực tiếp"""
-        if not DEEPSEEK_API_KEY:
-            return "❌ Hiện tại hệ thống đang quá tải. Em thử lại sau ít phút nhé!"
-        
-        try:
-            response = deepseek_client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "user", "content": user_input}],
-                temperature=0.75,
-                max_tokens=4000
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"❌ Lỗi hệ thống: {str(e)}\n\nEm thử lại sau nhé!"
-              
-
     # ================== CHAT INPUT ==================
     STEPS_SEARCH = [
         ("🔍", "Kết nối Google Search...", "Đang mở hệ thống tìm kiếm"),
@@ -1064,13 +1074,16 @@ Viết đầy đủ, dễ hiểu, có cảm xúc."""
                         <span class="spin-anim"></span>
                     </div>
                 ''', unsafe_allow_html=True)
-                import time
                 time.sleep(0.55)
             
             ph.empty()
 
             profile = st.session_state.get("profile", {})
             reply = call_ai(user_query, profile)
+            
+            # (Tùy chọn) Nếu bạn muốn gọi DeepSeek làm đẹp nội dung:
+            # reply = deepseek_refine(reply, user_query)
+            
             show_msg(reply)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})

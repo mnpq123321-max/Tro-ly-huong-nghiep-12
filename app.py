@@ -933,18 +933,19 @@ with tab_chat:
         return any(k in t.lower() for k in SCORE_KW)
 
     def build_hist(msgs: list) -> list:
-    hist = []
-    valid_msgs = msgs[1:-1] if len(msgs) > 1 else []  # Bỏ câu chào đầu và tin nhắn hiện tại
-    
-    for m in valid_msgs:
-        role = "model" if m["role"] == "assistant" else "user"
-        txt = re.sub(r'~~~JSON_TABLE.*?~~~END', '[bảng điểm chuẩn]', 
-                     m["content"], flags=re.DOTALL)
-        hist.append(types.Content(
-            role=role, 
-            parts=[types.Part(text=txt)]   # ← Sửa ở đây
-        ))
-    return hist
+        hist = []
+        # Bỏ câu chào đầu tiên của Thầy T và tin nhắn hiện tại
+        valid_msgs = msgs[1:-1] if len(msgs) > 1 else []
+        
+        for m in valid_msgs:
+            role = "model" if m["role"] == "assistant" else "user"
+            txt = re.sub(r'~~~JSON_TABLE.*?~~~END', '[bảng điểm chuẩn]', 
+                         m["content"], flags=re.DOTALL)
+            hist.append(types.Content(
+                role=role, 
+                parts=[types.Part(text=txt)]
+            ))
+        return hist
 
     def call_ai(user_input: str, profile: dict) -> str:
         history = build_hist(st.session_state.messages)

@@ -888,14 +888,12 @@ tab_chat, tab_quiz, tab_compare = st.tabs([
 ])
 
 # ════════════════════════════════════════════════════════
-#  TAB 1: CHAT
+# TAB 1: CHAT
 # ════════════════════════════════════════════════════════
 with tab_chat:
-
     # Khởi tạo lịch sử
     if "messages" not in st.session_state:
         st.session_state.messages = []
-
     if "greeted" not in st.session_state:
         st.session_state.greeted = True
         st.session_state.messages.append({"role": "assistant", "content": (
@@ -917,11 +915,13 @@ with tab_chat:
             "Cứ hỏi thẳng vào vấn đề — thầy không thích vòng vo. 👇"
         )})
 
-    # Hiển thị lịch sử
+    # Hiển thị lịch sử chat
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
-            if msg["role"] == "assistant": show_msg(msg["content"])
-            else: st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                show_msg(msg["content"])
+            else:
+                st.markdown(msg["content"])
 
     # Gợi ý nhanh
     if len(st.session_state.messages) == 1:
@@ -938,115 +938,90 @@ with tab_chat:
         cols = st.columns(3)
         for i, (ic, txt) in enumerate(sugs):
             with cols[i % 3]:
-                if st.button(f"{ic}  {txt}", key=f"sg{i}"):
+                if st.button(f"{ic} {txt}", key=f"sg{i}"):
                     st.session_state["_pend"] = txt
                     st.rerun()
 
-    # ── LOGIC GỌI AI ──────────────────────────────────
-    SCORE_KW = ["điểm chuẩn","tuyển sinh","xét tuyển","nguyện vọng",
-                "đăng ký","nộp hồ sơ","điểm đầu vào","bao nhiêu điểm",
-                "điểm xét","trúng tuyển","học trường nào","trường nào tốt",
-                "nên học ở đâu","trường nào gần","điểm vào"]
+    # ================== HÀM HỖ TRỢ ==================
+    SCORE_KW = ["điểm chuẩn","tuyển sinh","xét tuyển","nguyện vọng","điểm đầu vào",
+                "trúng tuyển","học trường nào","điểm chuẩn"]
 
     def needs_search(t: str) -> bool:
         return any(k in t.lower() for k in SCORE_KW)
 
     def build_hist(msgs: list) -> list:
         hist = []
-        for m in msgs[:-1]:
-            role = "model" if m["role"]=="assistant" else "user"
-            txt  = re.sub(r'~~~JSON_TABLE.*?~~~END','[bảng điểm chuẩn]',
-                          m["content"], flags=re.DOTALL)
-            hist.append(types.Content(role=role, parts=[types.Part(text=txt)]))
+        valid_msgs = msgs[1:-1] if len(msgs) > 1 else []  # Bỏ câu chào đầu và tin nhắn hiện tại
+        for m in valid_msgs:
+            role = "model" if m["role"] == "assistant" else "user"
+            txt = re.sub(r'~~~JSON_TABLE.*?~~~END', '[bảng điểm chuẩn]', 
+                         m["content"], flags=re.DOTALL)
+            hist.append(types.Content(role=role, parts=[types.Part.from_text(txt)]))
         return hist
 
     def call_ai(user_input: str, profile: dict) -> str:
-        history    = build_hist(st.session_state.messages)
+        history = build_hist(st.session_state.messages)
         use_search = needs_search(user_input)
-        enhanced   = user_input
+        
+        enhanced = user_input
         if use_search:
-            enhanced += (
-                "\n\n[LỆNH HỆ THỐNG]: Dùng Google Search tìm điểm chuẩn 2025 ngay bây giờ. "
-                "Điểm 2025 ĐÃ CÔNG BỐ tháng 8/2025 — tìm website chính thức trường trước. "
-                "Sau đó tìm 2024, 2023. Xuất kết quả qua JSON_TABLE đúng format."
-            )
-
-        if use_search:
-            try:
-                cfg  = make_cfg(True, profile)
-                chat = _client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
-                return chat.send_message(enhanced).text
-            except Exception:
-                pass
+            enhanced += "\n\n[LỆNH HỆ THỐNG]: Dùng Google Search tìm điểm chuẩn 2025 ngay. Tìm website chính thức trước."
 
         try:
-            cfg  = make_cfg(False, profile)
+            cfg = make_cfg(use_search, profile)
             chat = _client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
-            resp = chat.send_message(enhanced).text
-            if use_search:
-                resp += ("\n\n---\n> ⚠️ *Hệ thống tìm kiếm tạm bận — "
-                         "em xác minh điểm chuẩn tại website chính thức của trường nhé!*")
-            return resp
+            return chat.send_message(enhanced).text
         except Exception as e:
-            return f"❌ Hệ thống gặp sự cố: `{e}`\n\nEm thử lại sau vài phút nhé!"
+            return f"❌ Lỗi kết nối: {str(e)}\n\nEm thử hỏi lại nhé!"
 
-    # ── INPUT & LOADING ───────────────────────────────
-            # ── INPUT & LOADING ───────────────────────────────
-        STEPS_SEARCH = [
-            ("🔍", "Kết nối Google Search...", "Đang mở hệ thống tìm kiếm"),
-            ("📡", "Tìm điểm chuẩn 2025 từ nguồn chính thức...", "Website trường + báo lớn"),
-            ("📊", "Tổng hợp dữ liệu 2023–2024–2025...", "Đối chiếu nhiều nguồn"),
-            ("🔮", "Tính dự báo điểm chuẩn 2026...", "Phân tích xu hướng 3 năm"),
-            ("✍️", "Soạn bài tư vấn cá nhân hóa...", "Vui lòng chờ xíu nhé em ☕"),
-        ]
-        STEPS_BASIC = [
-            ("💭", "Thầy T đang phân tích câu hỏi...", ""),
-            ("✍️", "Soạn nội dung tư vấn...", "Vui lòng chờ xíu nhé em ☕"),
-        ]
+    # ================== CHAT INPUT ==================
+    STEPS_SEARCH = [
+        ("🔍", "Kết nối Google Search...", "Đang mở hệ thống tìm kiếm"),
+        ("📡", "Tìm điểm chuẩn 2025 từ nguồn chính thức...", "Website trường + báo lớn"),
+        ("📊", "Tổng hợp dữ liệu 2023–2024–2025...", "Đối chiếu nhiều nguồn"),
+        ("🔮", "Tính dự báo điểm chuẩn 2026...", "Phân tích xu hướng 3 năm"),
+        ("✍️", "Soạn bài tư vấn cá nhân hóa...", "Vui lòng chờ xíu nhé em ☕"),
+    ]
+    STEPS_BASIC = [
+        ("💭", "Thầy T đang phân tích câu hỏi...", ""),
+        ("✍️", "Soạn nội dung tư vấn...", "Vui lòng chờ xíu nhé em ☕"),
+    ]
 
-        pend = st.session_state.pop("_pend", None)
-        user_query = pend or st.chat_input(
-            "Em hỏi Thầy T gì cũng được — điểm chuẩn, chọn ngành, chọn trường... 💬",
-            key="cin",
-        )
+    pend = st.session_state.pop("_pend", None)
+    user_query = pend or st.chat_input(
+        "Em hỏi Thầy T gì cũng được — điểm chuẩn, chọn ngành, chọn trường... 💬",
+        key="cin"
+    )
 
-        if user_query:
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            with st.chat_message("user"):
-                st.markdown(user_query)
+    if user_query:
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        
+        with st.chat_message("user"):
+            st.markdown(user_query)
 
-            with st.chat_message("assistant"):
-                use_s = needs_search(user_query)
-                steps = STEPS_SEARCH if use_s else STEPS_BASIC
-
-                ph = st.empty()
-                for ico, main, sub in steps:
-                    sub_html = f'<br><span style="font-size:.78rem;color:#8b949e;">{sub}</span>' if sub else ''
-                    ph.markdown(
-                        f'''
-                        <div class="step-bar">
-                            <span class="ico">{ico}</span>
-                            <span class="txt">
-                                <strong style="color:#e6edf3">{main}</strong>{sub_html}
-                            </span>
-                            <span class="spin-anim"></span>
-                        </div>
-                        ''',
-                        unsafe_allow_html=True
-                    )
-                    import time
-                    time.sleep(0.55)
-                ph.empty()
-
-                profile = st.session_state.get("profile", {})
-                reply = call_ai(user_query, profile)
-                show_msg(reply)
-
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-            st.rerun()
+        with st.chat_message("assistant"):
+            use_s = needs_search(user_query)
+            steps = STEPS_SEARCH if use_s else STEPS_BASIC
+            ph = st.empty()
+            
+            for ico, main, sub in steps:
+                sub_html = f'<br><span style="font-size:.78rem;color:#8b949e;">{sub}</span>' if sub else ''
+                ph.markdown(f'''
+                    <div class="step-bar">
+                        <span class="ico">{ico}</span>
+                        <span class="txt">
+                            <strong style="color:#e6edf3">{main}</strong>{sub_html}
+                        </span>
+                        <span class="spin-anim"></span>
+                    </div>
+                ''', unsafe_allow_html=True)
+                import time
+                time.sleep(0.55)
+            
+            ph.empty()
 
             profile = st.session_state.get("profile", {})
-            reply   = call_ai(user_query, profile)
+            reply = call_ai(user_query, profile)
             show_msg(reply)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})

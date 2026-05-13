@@ -979,6 +979,45 @@ with tab_chat:
             return chat.send_message(enhanced).text
         except Exception as e:
             return f"❌ Lỗi kết nối: {str(e)}\n\nEm thử hỏi lại nhé!"
+              def deepseek_refine(gemini_text: str, user_input: str) -> str:
+        """DeepSeek làm đẹp nội dung từ Gemini"""
+        if not DEEPSEEK_API_KEY:
+            return gemini_text
+            
+        prompt = f"""Bạn là Thầy T. Dựa vào thông tin sau, hãy viết lại thành bài tư vấn chuyên nghiệp, ấm áp, rõ ràng, có cấu trúc đẹp theo phong cách Thầy T:
+
+Thông tin thô: {gemini_text}
+
+Câu hỏi của học sinh: {user_input}
+
+Viết đầy đủ, dễ hiểu, có cảm xúc."""
+        
+        try:
+            response = deepseek_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=3000
+            )
+            return response.choices[0].message.content
+        except:
+            return gemini_text
+
+    def deepseek_direct(user_input: str, history, profile) -> str:
+        """Dùng DeepSeek trực tiếp khi Gemini gặp vấn đề"""
+        if not DEEPSEEK_API_KEY:
+            return "❌ Hiện tại hệ thống đang quá tải. Em thử lại sau ít phút nhé!"
+        
+        try:
+            response = deepseek_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": user_input}],
+                temperature=0.75,
+                max_tokens=4000
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return f"❌ Lỗi hệ thống: {str(e)}\n\nEm thử lại sau nhé!"
 
     # ================== CHAT INPUT ==================
     STEPS_SEARCH = [

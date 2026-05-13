@@ -991,46 +991,59 @@ with tab_chat:
             return f"❌ Hệ thống gặp sự cố: `{e}`\n\nEm thử lại sau vài phút nhé!"
 
     # ── INPUT & LOADING ───────────────────────────────
-    STEPS_SEARCH = [
-        ("🔍","Kết nối Google Search...","Đang mở hệ thống tìm kiếm"),
-        ("📡","Tìm điểm chuẩn 2025 từ nguồn chính thức...","Website trường + báo lớn"),
-        ("📊","Tổng hợp dữ liệu 2023–2024–2025...","Đối chiếu nhiều nguồn"),
-        ("🔮","Tính dự báo điểm chuẩn 2026...","Phân tích xu hướng 3 năm"),
-        ("✍️","Soạn bài tư vấn cá nhân hóa...","Vui lòng chờ xíu nhé em ☕"),
-    ]
-    STEPS_BASIC = [
-        ("💭","Thầy T đang phân tích câu hỏi...",""),
-        ("✍️","Soạn nội dung tư vấn...","Vui lòng chờ xíu nhé em ☕"),
-    ]
+            # ── INPUT & LOADING ───────────────────────────────
+        STEPS_SEARCH = [
+            ("🔍", "Kết nối Google Search...", "Đang mở hệ thống tìm kiếm"),
+            ("📡", "Tìm điểm chuẩn 2025 từ nguồn chính thức...", "Website trường + báo lớn"),
+            ("📊", "Tổng hợp dữ liệu 2023–2024–2025...", "Đối chiếu nhiều nguồn"),
+            ("🔮", "Tính dự báo điểm chuẩn 2026...", "Phân tích xu hướng 3 năm"),
+            ("✍️", "Soạn bài tư vấn cá nhân hóa...", "Vui lòng chờ xíu nhé em ☕"),
+        ]
+        STEPS_BASIC = [
+            ("💭", "Thầy T đang phân tích câu hỏi...", ""),
+            ("✍️", "Soạn nội dung tư vấn...", "Vui lòng chờ xíu nhé em ☕"),
+        ]
 
-    pend       = st.session_state.pop("_pend", None)
-    user_query = pend or st.chat_input(
-        "Em hỏi Thầy T gì cũng được — điểm chuẩn, chọn ngành, chọn trường... 💬",
-        key="cin",
-    )
+        pend = st.session_state.pop("_pend", None)
+        user_query = pend or st.chat_input(
+            "Em hỏi Thầy T gì cũng được — điểm chuẩn, chọn ngành, chọn trường... 💬",
+            key="cin",
+        )
 
-    if user_query:
-        st.session_state.messages.append({"role": "user", "content": user_query})
-        with st.chat_message("user"):
-            st.markdown(user_query)
+        if user_query:
+            st.session_state.messages.append({"role": "user", "content": user_query})
+            with st.chat_message("user"):
+                st.markdown(user_query)
 
-        with st.chat_message("assistant"):
-            use_s = needs_search(user_query)
-            steps = STEPS_SEARCH if use_s else STEPS_BASIC
+            with st.chat_message("assistant"):
+                use_s = needs_search(user_query)
+                steps = STEPS_SEARCH if use_s else STEPS_BASIC
 
-            # Loading rõ ràng, không để màn hình trắng
-            ph = st.empty()
-            for ico, main, sub in steps:
-                ph.markdown(
-                    f'<div class="step-bar">'
-                    f'<span class="ico">{ico}</span>'
-                    f'<span class="txt"><strong style="color:#e6edf3">{main}</strong>'
-                    f'{"<br><span style=\\"font-size:.78rem;color:#8b949e;\\">" + sub + "</span>" if sub else ""}'
-                    f'</span><span class="spin-anim"></span></div>',
-                    unsafe_allow_html=True
-                )
-                import time; time.sleep(0.55)
-            ph.empty()
+                ph = st.empty()
+                for ico, main, sub in steps:
+                    sub_html = f'<br><span style="font-size:.78rem;color:#8b949e;">{sub}</span>' if sub else ''
+                    ph.markdown(
+                        f'''
+                        <div class="step-bar">
+                            <span class="ico">{ico}</span>
+                            <span class="txt">
+                                <strong style="color:#e6edf3">{main}</strong>{sub_html}
+                            </span>
+                            <span class="spin-anim"></span>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
+                    import time
+                    time.sleep(0.55)
+                ph.empty()
+
+                profile = st.session_state.get("profile", {})
+                reply = call_ai(user_query, profile)
+                show_msg(reply)
+
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.rerun()
 
             profile = st.session_state.get("profile", {})
             reply   = call_ai(user_query, profile)

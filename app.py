@@ -433,37 +433,54 @@ def _sc(v, kind="r"):
     return f'<span class="sb-{kind}">{v}</span>'
 
 def render_tables(text: str):
-    """Tìm JSON_TABLE → render HTML, trả về (clean_text, [html,...])."""
-    pat    = r'~~~JSON_TABLE\s*(.*?)\s*~~~END'
+    """Render cả bảng điểm chuẩn lẫn bảng trường đẹp hơn"""
+    pat = r'~~~JSON_TABLE\s*(.*?)\s*~~~END'
     blocks = re.findall(pat, text, re.DOTALL)
-    if not blocks: return text, []
-
+    if not blocks: 
+        return text, []
+    
     htmls, clean = [], text
     for i, raw in enumerate(blocks):
-        ph    = f"__T{i}__"
-        clean = re.sub(r'~~~JSON_TABLE\s*' + re.escape(raw) + r'\s*~~~END',
+        ph = f"__T{i}__"
+        clean = re.sub(r'~~~JSON_TABLE\s*' + re.escape(raw) + r'\s*~~~END', 
                        ph, clean, count=1, flags=re.DOTALL)
+        
         try:
             d = json.loads(raw.strip())
         except Exception:
             htmls.append(None); continue
 
-        note, rows = d.get("note",""), d.get("rows",[])
-        h = ('<div class="dct-wrap"><table class="dct"><thead><tr>'
-             + ''.join(f'<th>{c}</th>' for c in
-                       ["Trường","Tổ hợp","2023","2024","2025","Xu hướng","🔮 Dự báo 2026","Cơ sở"])
-             + '</tr></thead><tbody>')
-        for r in rows:
-            y3,y4,y5,y6 = r.get("y2023"),r.get("y2024"),r.get("y2025"),r.get("y2026_predict")
-            h += (f'<tr><td>{r.get("school","")}</td>'
-                  f'<td><span class="sb-c">{r.get("combo","")}</span></td>'
-                  f'<td>{_sc(y3)}</td><td>{_sc(y4)}</td><td>{_sc(y5)}</td>'
-                  f'<td>{_arr(y4,y5)}</td><td>{_sc(y6,"p")}</td>'
-                  f'<td style="font-size:.77rem;color:#8b949e;max-width:140px">{r.get("basis","")}</td></tr>')
+        title = d.get("title", "Bảng thông tin")
+        note = d.get("note", "")
+        rows = d.get("rows", [])
+
+        # === BẢNG TRƯỜNG (có cột "tier") ===
+        if rows and any("tier" in str(row) for row in rows if isinstance(row, dict)):
+            h = f'<div class="dct-wrap"><h3 style="color:#d4a017; margin:18px 0 12px 0; font-family:Playfair Display">{title}</h3>'
+            h += '<table class="dct"><thead><tr><th>Tầng</th><th>Trường</th><th>Vị trí</th><th>Điểm mạnh</th><th>Khoảng cách từ TN</th><th>Ghi chú</th></tr></thead><tbody>'
+            for r in rows:
+                h += f'<tr><td><strong>{r.get("tier","")}</strong></td>'
+                h += f'<td>{r.get("school","")}</td>'
+                h += f'<td>{r.get("location","")}</td>'
+                h += f'<td>{r.get("strength","")}</td>'
+                h += f'<td>{r.get("distance","")}</td>'
+                h += f'<td style="font-size:0.85rem;color:#8b949e">{r.get("note","")}</td></tr>'
+        else:
+            # === BẢNG ĐIỂM CHUẨN ===
+            h = f'<div class="dct-wrap"><h3 style="color:#d4a017;margin:12px 0">{title}</h3><table class="dct">'
+            h += '<thead><tr><th>Trường</th><th>Tổ hợp</th><th>2023</th><th>2024</th><th>2025</th><th>Xu hướng</th><th>🔮 Dự báo 2026</th><th>Cơ sở</th></tr></thead><tbody>'
+            for r in rows:
+                y3 = r.get("y2023")
+                y4 = r.get("y2024")
+                y5 = r.get("y2025")
+                y6 = r.get("y2026_predict")
+                h += (f'<tr><td>{r.get("school","")}</td>'
+                      f'<td><span class="sb-c">{r.get("combo","")}</span></td>'
+                      f'<td>{_sc(y3)}</td><td>{_sc(y4)}</td><td>{_sc(y5)}</td>'
+                      f'<td>{_arr(y4,y5)}</td><td>{_sc(y6,"p")}</td>'
+                      f'<td style="font-size:0.8rem;color:#8b949e">{r.get("basis","")}</td></tr>')
+
         h += '</tbody></table>'
-        h += ('<div class="note-pred">🔮 <strong>Dự báo 2026</strong> tính từ xu hướng '
-              '3 năm liên tiếp — chỉ mang tính định hướng. Điểm thực tế phụ thuộc số thí sinh '
-              'đăng ký và chỉ tiêu từng năm.</div>')
         if note:
             h += f'<div class="note-src">📌 {note}</div>'
         h += '</div>'

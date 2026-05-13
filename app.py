@@ -965,26 +965,28 @@ with tab_chat:
             ))
         return hist
 
-    def call_ai(user_input: str, profile: dict) -> str:
+        def call_ai(user_input: str, profile: dict) -> str:
         history = build_hist(st.session_state.messages)
         use_search = needs_search(user_input)
         
         enhanced = user_input
         if use_search:
             enhanced += "\n\n[LỆNH HỆ THỐNG]: Dùng Google Search tìm điểm chuẩn 2025 ngay. Tìm website chính thức trước."
-
         try:
             cfg = make_cfg(use_search, profile)
             chat = _client.chats.create(model=GEMINI_MODEL, config=cfg, history=history)
             return chat.send_message(enhanced).text
         except Exception as e:
             return f"❌ Lỗi kết nối: {str(e)}\n\nEm thử hỏi lại nhé!"
-              def deepseek_refine(gemini_text: str, user_input: str) -> str:
+
+
+    # ================== DEEPSEEK HỖ TRỢ ==================
+    def deepseek_refine(gemini_text: str, user_input: str) -> str:
         """DeepSeek làm đẹp nội dung từ Gemini"""
         if not DEEPSEEK_API_KEY:
             return gemini_text
             
-        prompt = f"""Bạn là Thầy T. Dựa vào thông tin sau, hãy viết lại thành bài tư vấn chuyên nghiệp, ấm áp, rõ ràng, có cấu trúc đẹp theo phong cách Thầy T:
+        prompt = f"""Bạn là Thầy T. Dựa vào thông tin sau, hãy viết lại thành bài tư vấn chuyên nghiệp, ấm áp, rõ ràng theo phong cách Thầy T:
 
 Thông tin thô: {gemini_text}
 
@@ -1003,8 +1005,9 @@ Viết đầy đủ, dễ hiểu, có cảm xúc."""
         except:
             return gemini_text
 
+
     def deepseek_direct(user_input: str, history, profile) -> str:
-        """Dùng DeepSeek trực tiếp khi Gemini gặp vấn đề"""
+        """Dùng DeepSeek trực tiếp"""
         if not DEEPSEEK_API_KEY:
             return "❌ Hiện tại hệ thống đang quá tải. Em thử lại sau ít phút nhé!"
         
@@ -1018,6 +1021,7 @@ Viết đầy đủ, dễ hiểu, có cảm xúc."""
             return response.choices[0].message.content
         except Exception as e:
             return f"❌ Lỗi hệ thống: {str(e)}\n\nEm thử lại sau nhé!"
+              
 
     # ================== CHAT INPUT ==================
     STEPS_SEARCH = [
